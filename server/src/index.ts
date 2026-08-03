@@ -1,5 +1,7 @@
 import express from 'express';
 import authRoutes from './routes/auth.routes';
+import campaignRoutes from './routes/campaign.routes';
+import claimRoutes from './routes/claim.routes';
 import { authMiddleware } from './middleware/auth.middleware';
 
 const app = express();
@@ -12,6 +14,8 @@ app.get('/health', (req, res) => {
 });
 
 app.use('/auth', authRoutes);
+app.use('/campaigns', campaignRoutes);
+app.use('/claims', claimRoutes);
 
 app.get('/protected', authMiddleware, (req, res) => {
   res.json({ 
