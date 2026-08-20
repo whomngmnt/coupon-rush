@@ -1,4 +1,5 @@
 import prisma from '../lib/prisma';
+import { Prisma } from '@prisma/client';
 
 export interface ClaimData {
   campaignId: string;
@@ -9,33 +10,55 @@ export class ClaimService {
   async claimCoupon(data: ClaimData) {
     const { campaignId, userId } = data;
 
-    const campaign = await prisma.campaign.findUnique({
-      where: { id: campaignId },
-    });
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        const campaign = await tx.campaign.findUnique({
+          where: { id: campaignId },
+        });
 
-    if (!campaign) {
-      throw new Error('Campaign not found');
+        if (!campaign) {
+          throw new Error('Campaign not found');
+        }
+
+        const updatedCampaign = await tx.campaign.update({
+          where: { 
+            id: campaignId,
+            issuedCount: {
+              lt: campaign.totalCoupons,
+            },
+          },
+          data: {
+            issuedCount: {
+              increment: 1,
+            },
+          },
+        });
+
+        const claim = await tx.claim.create({
+          data: {
+            campaignId,
+            userId,
+          },
+        });
+
+        return claim;
+      });
+
+      return result;
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2002') {
+          throw new Error('You have already claimed a coupon for this campaign');
+        }
+        if (error.code === 'P2025') {
+          throw new Error('No coupons left');
+        }
+      }
+      if (error instanceof Error && error.message === 'No coupons left') {
+        throw error;
+      }
+      throw error;
     }
-
-    if (campaign.issuedCount >= campaign.totalCoupons) {
-      throw new Error('No coupons left');
-    }
-
-    const claim = await prisma.claim.create({
-      data: {
-        campaignId,
-        userId,
-      },
-    });
-
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: {
-        issuedCount: campaign.issuedCount + 1,
-      },
-    });
-
-    return claim;
   }
 }
 
