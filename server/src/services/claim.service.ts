@@ -60,6 +60,25 @@ export class ClaimService {
       throw error;
     }
   }
+
+  async getUserClaims(userId: string) {
+    const claims = await prisma.claim.findMany({
+      where: { userId },
+      include: {
+        campaign: {
+          select: {
+            title: true,
+            description: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return claims;
+  }
 }
 
 export default new ClaimService();
